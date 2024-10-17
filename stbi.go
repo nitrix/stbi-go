@@ -14,7 +14,7 @@ import (
 // #include "stb_image.h"
 import "C"
 
-func Load(path string) (*image.RGBA, error) {
+func Load(path string) (*image.NRGBA, error) {
 	cpath := C.CString(path)
 	defer C.free(unsafe.Pointer(cpath))
 
@@ -26,7 +26,7 @@ func Load(path string) (*image.RGBA, error) {
 	}
 	defer C.stbi_image_free(unsafe.Pointer(data))
 
-	return &image.RGBA{
+	return &image.NRGBA{
 		Pix:    C.GoBytes(unsafe.Pointer(data), y*x*4),
 		Stride: 4,
 		Rect:   image.Rect(0, 0, int(x), int(y)),
@@ -52,7 +52,7 @@ func Loadf(path string) (dt []float32, w int, h int, comp int, mfree func(), err
 	return s, int(tw), int(th), int(tcomp), func() { C.stbi_image_free(unsafe.Pointer(data)) }, nil
 }
 
-func LoadFile(f *os.File) (*image.RGBA, error) {
+func LoadFile(f *os.File) (*image.NRGBA, error) {
 	mode := C.CString("rb")
 	defer C.free(unsafe.Pointer(mode))
 	fp, err := C.fdopen(C.int(f.Fd()), mode)
@@ -68,14 +68,14 @@ func LoadFile(f *os.File) (*image.RGBA, error) {
 	}
 	defer C.stbi_image_free(unsafe.Pointer(data))
 
-	return &image.RGBA{
+	return &image.NRGBA{
 		Pix:    C.GoBytes(unsafe.Pointer(data), y*x*4),
 		Stride: 4,
 		Rect:   image.Rect(0, 0, int(x), int(y)),
 	}, nil
 }
 
-func LoadMemory(b []byte) (*image.RGBA, error) {
+func LoadMemory(b []byte) (*image.NRGBA, error) {
 	var x, y C.int
 	mem := (*C.uchar)(unsafe.Pointer(&b[0]))
 	data := C.stbi_load_from_memory(mem, C.int(len(b)), &x, &y, nil, 4)
@@ -85,14 +85,14 @@ func LoadMemory(b []byte) (*image.RGBA, error) {
 	}
 	defer C.stbi_image_free(unsafe.Pointer(data))
 
-	return &image.RGBA{
+	return &image.NRGBA{
 		Pix:    C.GoBytes(unsafe.Pointer(data), y*x*4),
 		Stride: 4,
 		Rect:   image.Rect(0, 0, int(x), int(y)),
 	}, nil
 }
 
-func LoadReader(r io.Reader) (*image.RGBA, error) {
+func LoadReader(r io.Reader) (*image.NRGBA, error) {
 	if f, ok := r.(*os.File); ok {
 		return LoadFile(f)
 	}
