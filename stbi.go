@@ -10,7 +10,7 @@ import (
 
 //go:generate go run ./generator
 
-// #cgo LDFLAGS: -lm
+// #cgo LDFLAGS: -lm -O3
 // #include "stb_image.h"
 import "C"
 
