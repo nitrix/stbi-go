@@ -10,7 +10,8 @@ import (
 
 //go:generate go run ./generator
 
-// #cgo LDFLAGS: -lm -O3
+// #cgo CFLAGS: -O3
+// #cgo LDFLAGS: -lm
 // #include "stb_image.h"
 import "C"
 
@@ -20,17 +21,8 @@ func Load(path string) (*image.NRGBA, error) {
 
 	var x, y C.int
 	data := C.stbi_load(cpath, &x, &y, nil, 4)
-	if data == nil {
-		msg := C.GoString(C.stbi_failure_reason())
-		return nil, errors.New(msg)
-	}
-	defer C.stbi_image_free(unsafe.Pointer(data))
 
-	return &image.NRGBA{
-		Pix:    C.GoBytes(unsafe.Pointer(data), y*x*4),
-		Stride: 4,
-		Rect:   image.Rect(0, 0, int(x), int(y)),
-	}, nil
+	return toNRGBA(data, x, y)
 }
 
 func Loadf(path string) (dt []float32, w int, h int, comp int, mfree func(), err error) {
@@ -53,52 +45,45 @@ func Loadf(path string) (dt []float32, w int, h int, comp int, mfree func(), err
 }
 
 func LoadFile(f *os.File) (*image.NRGBA, error) {
-	mode := C.CString("rb")
-	defer C.free(unsafe.Pointer(mode))
-	fp, err := C.fdopen(C.int(f.Fd()), mode)
+	b, err := io.ReadAll(f)
 	if err != nil {
 		return nil, err
 	}
 
-	var x, y C.int
-	data := C.stbi_load_from_file(fp, &x, &y, nil, 4)
-	if data == nil {
-		msg := C.GoString(C.stbi_failure_reason())
-		return nil, errors.New(msg)
-	}
-	defer C.stbi_image_free(unsafe.Pointer(data))
-
-	return &image.NRGBA{
-		Pix:    C.GoBytes(unsafe.Pointer(data), y*x*4),
-		Stride: 4,
-		Rect:   image.Rect(0, 0, int(x), int(y)),
-	}, nil
+	return LoadMemory(b)
 }
 
 func LoadMemory(b []byte) (*image.NRGBA, error) {
-	var x, y C.int
-	mem := (*C.uchar)(unsafe.Pointer(&b[0]))
-	data := C.stbi_load_from_memory(mem, C.int(len(b)), &x, &y, nil, 4)
-	if data == nil {
-		msg := C.GoString(C.stbi_failure_reason())
-		return nil, errors.New(msg)
+	if len(b) == 0 {
+		return nil, errors.New("empty image data")
 	}
-	defer C.stbi_image_free(unsafe.Pointer(data))
 
-	return &image.NRGBA{
-		Pix:    C.GoBytes(unsafe.Pointer(data), y*x*4),
-		Stride: 4,
-		Rect:   image.Rect(0, 0, int(x), int(y)),
-	}, nil
+	var x, y C.int
+	mem := (*C.stbi_uc)(unsafe.Pointer(&b[0]))
+	data := C.stbi_load_from_memory(mem, C.int(len(b)), &x, &y, nil, 4)
+
+	return toNRGBA(data, x, y)
 }
 
 func LoadReader(r io.Reader) (*image.NRGBA, error) {
-	if f, ok := r.(*os.File); ok {
-		return LoadFile(f)
-	}
 	b, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
 	return LoadMemory(b)
+}
+
+// toNRGBA copies 4-channel pixel data returned by stb_image into Go memory and frees it.
+func toNRGBA(data *C.stbi_uc, x, y C.int) (*image.NRGBA, error) {
+	if data == nil {
+		msg := C.GoString(C.stbi_failure_reason())
+		return nil, errors.New(msg)
+	}
+	defer C.stbi_image_free(unsafe.Pointer(data))
+
+	return &image.NRGBA{
+		Pix:    C.GoBytes(unsafe.Pointer(data), y*x*4),
+		Stride: int(x) * 4,
+		Rect:   image.Rect(0, 0, int(x), int(y)),
+	}, nil
 }
