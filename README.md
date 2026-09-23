@@ -12,17 +12,35 @@ import (
 func example() error {
 	img, err := stbi.Load("example.jpg")
 	if err != nil {
-        return err
+		return err
 	}
-	
-    // Do what you want with `img` here.
-    // It's an `*image.RGBA` with the pixel data in `.Pix` as usual.
 
-    return nil
+	// Do what you want with `img` here.
+	// It's an `*image.NRGBA` (non-premultiplied alpha) with the pixel data in `.Pix` as usual.
+
+	return nil
 }
 ```
 
-There's also `LoadFile` to load from an `*os.File`, `LoadMemory` to load from a `[]byte` and `Loadf` which loads HDR images.
+Every loader has a `Raw` variant that skips copying the pixels into Go memory. The returned slice is backed by C memory, so it must be released with `stbi.Free` and not used afterwards. This is useful when the pixels are handed off right away, for example uploaded to the GPU.
+
+```go
+pix, width, height, err := stbi.LoadRaw("example.jpg")
+if err != nil {
+	return err
+}
+defer stbi.Free(pix)
+```
+
+| Source | Image (Go memory) | Raw (C memory, call `Free`) |
+|---|---|---|
+| Path | `Load` | `LoadRaw` |
+| `*os.File` | `LoadFile` | `LoadFileRaw` |
+| `[]byte` | `LoadMemory` | `LoadMemoryRaw` |
+| `io.Reader` | `LoadReader` | `LoadReaderRaw` |
+| Path, as floats (HDR) | `Loadf` → `*stbi.NRGBAF32` | `LoadfRaw` → `[]float32` |
+
+Pixels are always decoded to 4 channels (RGBA).
 
 ## Credits
 
